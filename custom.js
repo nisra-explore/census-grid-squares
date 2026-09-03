@@ -2202,31 +2202,27 @@ map.on('error', (e) => {
 
     });
 
-    function updateSelectedPopulation() {
+function updateSelectedPopulation() {
+  let totalPopulation = 0;
+  let totalHousehold = 0;
 
-      let totalPopulation = 0;
-      let totalHousehold = 0; 
+  selectedGridIds.forEach(gridId => {
+    const row = gridDataCache[gridId];
 
-      selectedGridIds.forEach(gridId => {
-
-        const row = gridDataCache[gridId];
-
-        if (row) {
-          totalPopulation += Number(row[3]) || 0;
-          totalHousehold += Number(row[2]) || 0;
-        }
-
-      });
-      
-      document.querySelector('.total-population').textContent =
-        totalPopulation.toLocaleString();
-
-      document.querySelector('.total-households').textContent =
-        totalHousehold.toLocaleString();
-
-      console.log('Population:', totalPopulation);
-      console.log('Households:', totalHousehold);
+    if (row) {
+      totalPopulation += Number(row[3]) || 0;
+      totalHousehold += Number(row[2]) || 0;
     }
+  });
+
+  document.querySelectorAll('.total-population').forEach(el => {
+    el.textContent = totalPopulation.toLocaleString();
+  });
+
+  document.querySelectorAll('.total-households').forEach(el => {
+    el.textContent = totalHousehold.toLocaleString();
+  });
+}
 
     map.on('click', 'grid-fill', async (e) => {
 
@@ -2246,6 +2242,8 @@ map.on('error', (e) => {
       console.log('Selected squares:', selectedGridIds);
 
       updateSelectedPopulation();
+      console.log("selectedIds", [...selectedIds]);
+console.log("selectedGridIds", [...selectedGridIds]);
     });
 
     map.on('click', 'grid-fill', (e) => {
@@ -2359,6 +2357,11 @@ map.on('error', (e) => {
           const key = activeZone === 'lgd' ? (f.properties.LGDNAME || f.properties.lgd_name || f.properties.LGD || id) : id;
           if (selectedIds.has(key)) {
             selectedIds.delete(key);
+            selectedIds.delete(key);
+
+if (activeZone === 'grid') {
+    selectedGridIds.delete(id);
+}
             if (activeZone === 'lgd') lgdNameToId.delete(key);
             map.setFeatureState({ source, sourceLayer, id }, { hovered: false });
           }
@@ -2369,10 +2372,22 @@ map.on('error', (e) => {
           const id = f.id;
           const key = activeZone === 'lgd' ? (f.properties.LGDNAME || f.properties.lgd_name || f.properties.LGD || id) : id;
           if (!selectedIds.has(key)) {
-            selectedIds.add(key);
-            if (activeZone === 'lgd') lgdNameToId.set(key, id);
-            map.setFeatureState({ source, sourceLayer, id }, { hovered: true });
-          }
+
+    selectedIds.add(key);
+
+    // ADD THIS
+    if (activeZone === 'grid') {
+        selectedGridIds.add(id);
+    }
+
+    if (activeZone === 'lgd')
+        lgdNameToId.set(key, id);
+
+    map.setFeatureState(
+        { source, sourceLayer, id },
+        { hovered: true }
+    );
+}
         });
       }
 
@@ -4683,6 +4698,21 @@ console.log("availableKeys", availableKeys);
   }
 
   function clearSelections() {
+    const gridIdsToClear = new Set(selectedGridIds);
+    map.queryRenderedFeatures({ layers: ['grid-fill'] }).forEach((feature) => {
+      if (feature.id !== undefined && feature.id !== null) {
+        gridIdsToClear.add(feature.id);
+      }
+    });
+
+    gridIdsToClear.forEach((id) => {
+      map.setFeatureState(
+        { source: 'grid', sourceLayer: 'Grid_Square_2021_1km', id },
+        { hovered: false, selected: false }
+      );
+    });
+    map.removeFeatureState({ source: 'grid', sourceLayer: 'Grid_Square_2021_1km' });
+
     if (currentZoneType === 'sdz') {
       map.removeFeatureState({ source: 'sdz2021', sourceLayer: 'SDZ2021_clipped' });
     } else if (currentZoneType === 'dz') {
@@ -4694,7 +4724,8 @@ console.log("availableKeys", availableKeys);
     }
 
     selectedIds.clear();
-
+selectedGridIds.clear();
+updateSelectedPopulation();
     if (previewMap) {
       const { source, sourceLayer } = getZoneIdsFor(currentZoneType);
 
